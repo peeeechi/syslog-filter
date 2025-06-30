@@ -90,20 +90,20 @@ def convert_wildcard_to_regex(pattern):
 def main():
     st.title("Syslog Filter")
 
-    # ファイルアップロードとデータ解析をセッションステートで管理
+    # ファイルロードとデータ解析をセッションステートで管理
     if 'df_original' not in st.session_state:
         st.session_state.df_original = None
-        st.session_state.file_uploaded_name = None
+        st.session_state.file_loaded_name = None
 
     # フィルタ条件のリストをセッションステートで管理
     if 'filters' not in st.session_state:
         st.session_state.filters = [{"keyword": "", "operator": "AND"}] # 初期状態で1つのフィルタを用意
 
-    uploaded_file = st.file_uploader("Syslog ファイルを選択してください", type=["log", "txt"])
+    loaded_file = st.file_uploader("Syslog ファイルを選択してください", type=["log", "txt"])
 
-    if uploaded_file is not None and uploaded_file.name != st.session_state.file_uploaded_name:
-        with st.spinner(f"ファイル '{uploaded_file.name}' を読み込み中..."):
-            stringio = uploaded_file.getvalue().decode("utf-8")
+    if loaded_file is not None and loaded_file.name != st.session_state.file_loaded_name:
+        with st.spinner(f"ファイル '{loaded_file.name}' を読み込み中..."):
+            stringio = loaded_file.getvalue().decode("utf-8")
             lines = stringio.splitlines()
 
             parsed_logs = []
@@ -118,16 +118,16 @@ def main():
                 if not isinstance(df["Timestamp"].iloc[0], datetime):
                     df["Timestamp"] = pd.to_datetime(df["Timestamp"])
                 st.session_state.df_original = df
-                st.session_state.file_uploaded_name = uploaded_file.name
-                st.success(f"ファイル '{uploaded_file.name}' を読み込みました。")
+                st.session_state.file_loaded_name = loaded_file.name
+                st.success(f"ファイル '{loaded_file.name}' を読み込みました。")
             else:
                 st.warning("解析可能なSyslogエントリが見つかりませんでした。ファイル形式を確認してください。")
                 st.session_state.df_original = None
-                st.session_state.file_uploaded_name = None
-    elif uploaded_file is None:
+                st.session_state.file_loaded_name = None
+    elif loaded_file is None:
         # ファイルがクリアされた場合、セッションステートもクリア
         st.session_state.df_original = None
-        st.session_state.file_uploaded_name = None
+        st.session_state.file_loaded_name = None
         # フィルタも初期状態に戻す
         st.session_state.filters = [{"keyword": "", "operator": "AND"}]
 
@@ -233,7 +233,7 @@ def main():
             mime='text/csv',
         )
     else:
-        st.info("Syslogファイルをアップロードしてください。")
+        st.info("Syslogファイルを選択してください。")
 
 if __name__ == "__main__":
     main()
