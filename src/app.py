@@ -233,7 +233,7 @@ def main():
             mime='text/csv',
         )
     else:
-        st.info("Syslogファイルをアップロードしてください。")
+        st.info("Syslogファイルを選択してください。")
 
 if __name__ == "__main__":
     main()
