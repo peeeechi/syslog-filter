@@ -1,4 +1,4 @@
-# utils/file_handlers.py
+# src/utils/file_handlers.py
 import streamlit as st
 import zipfile
 import os
@@ -8,12 +8,12 @@ import io
 import pandas as pd
 from datetime import datetime
 
-from .log_parser_utils import parse_syslog_line # 同じutilsパッケージからインポート
+# utilsからparse_syslog_lineをインポート (変更)
+# from .log_parser_utils import parse_syslog_line # 変更前
+from .log_parser_utils import parse_syslog_line # 変更後 (すでに相対パス)
 
 def extract_zip(uploaded_file, extract_to):
-    """ZIPファイルを指定されたディレクトリに展開する"""
     try:
-        # StreamlitのUploadedFileオブジェクトからBytesIOを取得
         with zipfile.ZipFile(io.BytesIO(uploaded_file.getvalue()), 'r') as zip_ref:
             zip_ref.extractall(extract_to)
         st.success(f"ZIPファイルを '{extract_to}' に展開しました。")
@@ -26,20 +26,19 @@ def extract_zip(uploaded_file, extract_to):
         return False
 
 def decompress_zstd_files(directory):
-    """指定されたディレクトリ内のすべての.zstファイルを展開する"""
     decompressed_count = 0
     for root, _, files in os.walk(directory):
         for file in files:
-            if file.endswith('.zst'): # <-- ここを修正
+            if file.endswith('.zst'):
                 zstd_file_path = os.path.join(root, file)
-                output_file_path = zstd_file_path.replace('.zst', '') # <-- ここも修正
+                output_file_path = zstd_file_path.replace('.zst', '')
                 try:
                     with open(zstd_file_path, 'rb') as f_in:
                         dctx = zstd.ZstdDecompressor()
                         with open(output_file_path, 'wb') as f_out:
                             dctx.copy_stream(f_in, f_out)
                     decompressed_count += 1
-                    os.remove(zstd_file_path) # 元の.zstファイルを削除
+                    os.remove(zstd_file_path)
                 except Exception as e:
                     st.warning(f"'{file}' (.zst) の展開中にエラーが発生しました: {e}")
     if decompressed_count > 0:
@@ -47,7 +46,6 @@ def decompress_zstd_files(directory):
     return decompressed_count
 
 def get_log_files(directory):
-    """指定されたディレクトリとサブディレクトリ内の.logファイルを探す"""
     log_files = []
     for root, _, files in os.walk(directory):
         for file in files:
@@ -56,13 +54,9 @@ def get_log_files(directory):
     return log_files
 
 def load_logs_from_path(log_source):
-    """
-    ログファイルパスまたはUploadedFileオブジェクトからログを読み込み、DataFrameを返す。
-    parse_syslog_line関数 (utils.log_parser_utils) を使用。
-    """
     parsed_logs = []
     
-    if isinstance(log_source, str): # パスの場合
+    if isinstance(log_source, str):
         try:
             with open(log_source, 'r', encoding='utf-8', errors='ignore') as f:
                 for line in f:
@@ -73,7 +67,7 @@ def load_logs_from_path(log_source):
         except Exception as e:
             st.error(f"ログファイルの読み込み中にエラーが発生しました ('{os.path.basename(log_source)}'): {e}")
             return pd.DataFrame()
-    else: # UploadedFileオブジェクトの場合
+    else:
         try:
             string_io = io.StringIO(log_source.getvalue().decode("utf-8", errors='ignore'))
             for line in string_io.readlines():

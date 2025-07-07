@@ -1,7 +1,18 @@
-# main_app.py
-import streamlit as st
-from app_pages import existing_filter_page, datetime_extract_page, about_page, upload_data_page # upload_data_page を追加
+# src/main_app.py
+import sys
 import os
+
+# プロジェクトのルートディレクトリをsys.pathに追加
+# main_app.py が /project_root/src/ にあると仮定
+# os.path.dirname(__file__) は /project_root/src/
+# os.path.join(..., os.pardir) で一つ上の階層 /project_root/ に移動
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+# これで 'src' をパッケージのルートとして絶対インポートが可能になります
+from src.app_pages import existing_filter_page, datetime_extract_page, about_page, upload_data_page
+import streamlit as st
 import shutil
 from datetime import datetime
 
@@ -11,14 +22,13 @@ st.set_page_config(layout="wide")
 st.sidebar.title("Syslog Filter App")
 st.sidebar.markdown("---")
 
-# メニュー選択
 selection = st.sidebar.radio(
     "メニューを選択",
-    ["データ読み込み", "キーワードフィルタリング", "日付/時刻抽出", "このアプリケーションについて"] # 「データ読み込み」を追加
+    ["データ読み込み", "キーワードフィルタリング", "日付/時刻抽出", "このアプリケーションについて"]
 )
 
 # --- ページ表示ロジック ---
-if selection == "データ読み込み": # 新しいページを追加
+if selection == "データ読み込み":
     upload_data_page.run()
 elif selection == "キーワードフィルタリング":
     existing_filter_page.run()
@@ -28,7 +38,7 @@ elif selection == "このアプリケーションについて":
     about_page.run()
 
 # --- 一時ファイル管理 (共通) ---
-CLEANUP_ROOT_DIR = "temp_syslog_upload" # クリーンアップ対象のルートディレクトリ
+CLEANUP_ROOT_DIR = "temp_syslog_upload"
 
 st.sidebar.markdown("---")
 if st.sidebar.button("一時ファイルをクリーンアップ (全て削除)"):
@@ -39,7 +49,6 @@ if st.sidebar.button("一時ファイルをクリーンアップ (全て削除)"
         try:
             shutil.rmtree(full_cleanup_path)
             
-            # セッションステートに関連するデータをクリア
             st.session_state.global_temp_dir = None
             st.session_state.df = None
             if 'found_log_files' in st.session_state:
