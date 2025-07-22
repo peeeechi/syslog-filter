@@ -1,3 +1,6 @@
 pandas==2.2.3
 numpy==1.26.4
 streamlit==1.46.1
+pyyaml
+typeguard
+zstandard
