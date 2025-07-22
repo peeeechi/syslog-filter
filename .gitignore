@@ -5,11 +5,13 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-env/
 venv/
 lib/
 lib64/
+lib64
 local/
+etc/
+pyvenv.cfg
 share/
 include/
 bin/
