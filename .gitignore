@@ -1,1 +1,23 @@
 /env
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+lib/
+lib64/
+local/
+share/
+include/
+bin/
+*.egg-info/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.vscode/
+*.log # logs directory may contain .log files
+temp_syslog_upload/ # 追加: 一時ディレクトリもGit管理対象外に
