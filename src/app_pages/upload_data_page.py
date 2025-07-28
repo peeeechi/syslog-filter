@@ -5,16 +5,13 @@ import os
 import shutil
 from datetime import datetime
 
-# utilsからヘルパー関数をインポート (変更)
-from src.utils.file_handlers import extract_zip, decompress_zstd_files, get_log_files, load_logs_from_path # 変更後 (絶対パス)
+# utilsからヘルパー関数をインポート
+from src.utils.file_handlers import extract_zip, decompress_zstd_files, get_log_files, load_logs_from_path
 
 def run():
     st.title("ログデータの読み込み")
     st.markdown("分析を開始するには、まずログファイルをアップロードしてください。")
 
-    if 'df' not in st.session_state or st.session_state.df is None:
-        st.session_state.df = pd.DataFrame()
-    
     if 'global_temp_dir' not in st.session_state or st.session_state.global_temp_dir is None:
         st.session_state.global_temp_dir = os.path.join("temp_syslog_upload", datetime.now().strftime("%Y%m%d%H%M%S_%f"))
         os.makedirs(st.session_state.global_temp_dir, exist_ok=True)
@@ -63,11 +60,39 @@ def run():
              st.warning("展開されたディレクトリ内に.logファイルが見つかりませんでした。")
         
         st.success("データの読み込みが完了しました。")
-        st.markdown("他の分析ページに移動して、ログデータを操作してください。")
+        st.markdown("---")
 
     else:
         if not st.session_state.df.empty:
             st.success(f"{len(st.session_state.df)}件のログデータが現在読み込まれています。")
             st.dataframe(st.session_state.df.head())
+            st.markdown("---")
         else:
             st.info("ログファイルがまだ読み込まれていません。")
+
+    if not st.session_state.df.empty:
+        # --- ボタンを大きく見せるためのCSS ---
+        st.markdown("""
+        <style>
+        .nav-buttons-container .stButton>button {
+            font-size: 1.2rem;
+            padding: 15px 30px;
+            width: 100%;
+        }
+        </style>
+        <div class="nav-buttons-container">
+        """, unsafe_allow_html=True)
+
+        st.subheader("分析ページに移動する")
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button(":mag: キーワードフィルタリングへ", key="nav_to_keyword_page_btn"):
+                st.session_state.current_page = "keyword_filter"
+                st.rerun()
+        with col_btn2:
+            if st.button(":calendar: 日付/時刻抽出へ", key="nav_to_datetime_page_btn"):
+                st.session_state.current_page = "datetime_extract"
+                st.rerun()
+        
+        # CSSコンテナを閉じる
+        st.markdown("</div>", unsafe_allow_html=True)
