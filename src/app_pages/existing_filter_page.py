@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import re
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, time, date
 
 # utilsからparse_syslog_lineをインポート
 from src.utils.log_parser_utils import parse_syslog_line
@@ -45,54 +45,26 @@ def generate_time_options(interval_minutes=5):
 def run():
     st.title("Syslog Filter (キーワードフィルタリング)")
 
-    df_source = st.session_state.df if 'df' in st.session_state and st.session_state.df is not None else pd.DataFrame()
-
+    df_source = st.session_state.df_filtered if 'df_filtered' in st.session_state and not st.session_state.df_filtered.empty else st.session_state.df
+    
     if 'filters_keyword_page' not in st.session_state:
         st.session_state.filters_keyword_page = [{"keyword": "", "operator": "AND"}]
 
     if not df_source.empty:
         st.write(f"元のログの行数: {len(df_source)}行")
 
-        # --- 日付と時刻のフィルタリングUIを追加 ---
-        st.subheader("日時によるフィルタリング")
-
-        min_date_available = df_source['Timestamp'].dt.date.min() if not df_source['Timestamp'].empty else date.today()
-        max_date_available = df_source['Timestamp'].dt.date.max() if not df_source['Timestamp'].empty else date.today()
-        default_start_date = min_date_available if not df_source.empty and pd.notna(min_date_available) else date.today()
-        default_end_date = max_date_available if not df_source.empty and pd.notna(max_date_available) else date.today()
-
-        col_date_start, col_date_end = st.columns(2)
-        with col_date_start:
-            start_date_selection = st.date_input(
-                "開始日:",
-                value=default_start_date,
-                min_value=min_date_available,
-                max_value=max_date_available if pd.notna(max_date_available) else date.today(),
-                key="start_date_input_filter"
-            )
-        with col_date_end:
-            end_date_selection = st.date_input(
-                "終了日:",
-                value=default_end_date,
-                min_value=start_date_selection,
-                max_value=max_date_available if pd.notna(max_date_available) else date.today(),
-                key="end_date_input_filter"
-            )
-
-        if start_date_selection > end_date_selection:
-            st.warning("開始日は終了日より前の日付にしてください。")
-            
-        time_options = generate_time_options(5)
-        col_time_start, col_time_end = st.columns(2)
-        with col_time_start:
-            selected_start_time_str = st.selectbox("開始時刻 (HH:MM):", time_options, index=0, key="start_time_select_filter")
-            start_time_obj = datetime.strptime(selected_start_time_str, '%H:%M').time()
-        with col_time_end:
-            selected_end_time_str = st.selectbox("終了時刻 (HH:MM):", time_options, index=len(time_options) - 1, key="end_time_select_filter")
-            end_time_obj = datetime.strptime(selected_end_time_str, '%H:%M').time()
-
-        st.markdown("---")
-
+        # --- 修正箇所: 日時によるフィルタリング設定を表示するExpander ---
+        if 'datetime_spec_conditions' in st.session_state:
+            conditions = st.session_state.datetime_spec_conditions
+            with st.expander("日時絞り込みの現在の設定を表示"):
+                # start_time と end_time を hour と minute から構築
+                start_time_str_display = f"{conditions.get('start_hour', '00')}:{conditions.get('start_minute', '00')}"
+                end_time_str_display = f"{conditions.get('end_hour', '23')}:{conditions.get('end_minute', '59')}"
+                
+                st.write(f"**開始日時**: {conditions.get('start_date', '未設定')} {start_time_str_display}")
+                st.write(f"**終了日時**: {conditions.get('end_date', '未設定')} {end_time_str_display}")
+                st.write(f"**絞り込み済みログ数**: {conditions.get('filtered_count', 'N/A')}行")
+        # ----------------------------------------------------
 
         st.subheader("キーワードによるフィルタリング")
         st.info("キーワードで **`*` は0文字以上の任意の文字、**`?` は任意の1文字**を表します。")
@@ -133,50 +105,39 @@ def run():
         st.button("フィルタ追加", on_click=add_filter, key="add_filter_button_keyword_page")
         st.markdown("---")
 
-        # --- フィルタリングロジックの再構築 ---
-        # まず元のデータフレームをコピー
         filtered_df = df_source.copy()
 
-        # 1. 日付と時刻でフィルタリング
-        if not filtered_df.empty and 'Timestamp' in filtered_df.columns and filtered_df['Timestamp'].notna().any():
-            # 開始日時と終了日時を結合してフィルタリング
-            filtered_df = filtered_df[
-                (filtered_df['Timestamp'].dt.date >= start_date_selection) &
-                (filtered_df['Timestamp'].dt.date <= end_date_selection) &
-                (filtered_df['Timestamp'].dt.time >= start_time_obj) &
-                (filtered_df['Timestamp'].dt.time <= end_time_obj)
-            ]
-
-        # 2. キーワードでフィルタリング
-        if not filtered_df.empty and st.session_state.filters_keyword_page:
-            current_filter_series = None
-            
-            first_condition_keyword = st.session_state.filters_keyword_page[0]['keyword'].strip()
-            if first_condition_keyword:
-                first_regex = convert_wildcard_to_regex(first_condition_keyword)
-                current_filter_series = filtered_df['Message'].str.contains(first_regex, case=False, na=False, regex=True)
-            else:
-                current_filter_series = pd.Series([True] * len(filtered_df), index=filtered_df.index)
+        if not df_source.empty:
+            # キーワードフィルタリングロジック
+            if st.session_state.filters_keyword_page:
+                current_filter_series = None
                 
-            for i in range(1, len(st.session_state.filters_keyword_page)):
-                condition = st.session_state.filters_keyword_page[i]
-                keyword = condition['keyword'].strip()
-                operator = condition['operator']
-                if not keyword:
-                    continue
+                first_condition_keyword = st.session_state.filters_keyword_page[0]['keyword'].strip()
+                if first_condition_keyword:
+                    first_regex = convert_wildcard_to_regex(first_condition_keyword)
+                    current_filter_series = filtered_df['Message'].str.contains(first_regex, case=False, na=False, regex=True)
+                else:
+                    current_filter_series = pd.Series([True] * len(filtered_df), index=filtered_df.index)
+                    
+                for i in range(1, len(st.session_state.filters_keyword_page)):
+                    condition = st.session_state.filters_keyword_page[i]
+                    keyword = condition['keyword'].strip()
+                    operator = condition['operator']
+                    if not keyword:
+                        continue
 
-                regex_keyword = convert_wildcard_to_regex(keyword)
-                current_condition = filtered_df['Message'].str.contains(regex_keyword, case=False, na=False, regex=True)
+                    regex_keyword = convert_wildcard_to_regex(keyword)
+                    current_condition = filtered_df['Message'].str.contains(regex_keyword, case=False, na=False, regex=True)
 
-                if operator == "AND":
-                    current_filter_series = current_filter_series & current_condition
-                elif operator == "OR":
-                    current_filter_series = current_filter_series | current_condition
-            
-            if current_filter_series is not None:
-                filtered_df = filtered_df[current_filter_series]
-            else:
-                filtered_df = pd.DataFrame()
+                    if operator == "AND":
+                        current_filter_series = current_filter_series & current_condition
+                    elif operator == "OR":
+                        current_filter_series = current_filter_series | current_condition
+                
+                if current_filter_series is not None:
+                    filtered_df = filtered_df[current_filter_series]
+                else:
+                    filtered_df = pd.DataFrame()
         
         st.subheader("表示設定")
         max_rows = st.slider("表示する最大行数", 100, 1000000, 2000, key="max_rows_filter_page")
@@ -201,4 +162,4 @@ def run():
         else:
             st.info("表示するログがありません。フィルタリング条件を確認してください。")
     else:
-        st.warning("ログデータが読み込まれていません。「データ読み込み」ページでファイルをアップロードしてください。")
+        st.warning("ログデータが読み込まれていません。「データ読み込み」ページでファイルをアップロードするか、「日時指定・抽出」ページでログを絞り込んでください。")

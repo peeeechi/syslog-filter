@@ -70,29 +70,14 @@ def run():
         else:
             st.info("ログファイルがまだ読み込まれていません。")
 
+    # --- 修正箇所: 自動遷移ロジックのみ残す ---
     if not st.session_state.df.empty:
-        # --- ボタンを大きく見せるためのCSS ---
-        st.markdown("""
-        <style>
-        .nav-buttons-container .stButton>button {
-            font-size: 1.2rem;
-            padding: 15px 30px;
-            width: 100%;
-        }
-        </style>
-        <div class="nav-buttons-container">
-        """, unsafe_allow_html=True)
-
-        st.subheader("分析ページに移動する")
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            if st.button(":mag: キーワードフィルタリングへ", key="nav_to_keyword_page_btn"):
-                st.session_state.current_page = "keyword_filter"
-                st.rerun()
-        with col_btn2:
-            if st.button(":calendar: 日付/時刻抽出へ", key="nav_to_datetime_page_btn"):
-                st.session_state.current_page = "datetime_extract"
-                st.rerun()
-        
-        # CSSコンテナを閉じる
-        st.markdown("</div>", unsafe_allow_html=True)
+        # トップページに戻るボタンからの遷移ではない場合のみ、自動遷移
+        if not st.session_state.get('is_returning_from_top_button', False):
+            st.session_state.current_page = "datetime_spec"
+            st.rerun()
+        else:
+            # フラグをリセットし、ページに留まる
+            st.session_state.is_returning_from_top_button = False
+            # ログデータが読み込まれていれば、その旨を表示
+            st.info("ログデータの読み込みが完了しました。左側の「日時指定・抽出」に進んでください。")

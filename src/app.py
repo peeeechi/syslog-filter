@@ -12,7 +12,8 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 # 各ページをインポート
-from src.app_pages import existing_filter_page, datetime_extract_page, about_page, upload_data_page
+# from src.app_pages import existing_filter_page, datetime_extract_page, about_page, upload_data_page, timeline_diagram_page, datetime_spec_page # 変更前
+from src.app_pages import existing_filter_page, datetime_extract_page, about_page, upload_data_page, datetime_spec_page # 変更後 (timeline_diagram_page を削除)
 
 st.set_page_config(layout="wide")
 
@@ -21,22 +22,24 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = "data_upload"
 if 'df' not in st.session_state:
     st.session_state.df = pd.DataFrame()
+if 'df_filtered' not in st.session_state:
+    st.session_state.df_filtered = pd.DataFrame()
 if 'global_temp_dir' not in st.session_state:
     st.session_state.global_temp_dir = None
+if 'is_returning_from_top_button' not in st.session_state:
+    st.session_state.is_returning_from_top_button = False
 
 
 # --- サイドバーのUI ---
 st.sidebar.title("Syslog Filter App")
 st.sidebar.markdown("---")
 
-# 「このアプリケーションについて」ボタン
-if st.sidebar.button("このアプリケーションについて"):
+if st.sidebar.button(":information_source: このアプリケーションについて"):
     st.session_state.current_page = "about"
 st.sidebar.markdown("---")
 
-# 「一時ファイルをクリーンアップ」ボタン
 CLEANUP_ROOT_DIR = "temp_syslog_upload"
-if st.sidebar.button("一時ファイルをクリーンアップ (全て削除)"):
+if st.sidebar.button(":wastebasket: 一時ファイルをクリーンアップ (全て削除)"):
     full_cleanup_path = os.path.abspath(CLEANUP_ROOT_DIR)
     print(f"DEBUG: クリーンアップを試行します。対象ディレクトリ: {full_cleanup_path}")
     if os.path.exists(full_cleanup_path):
@@ -44,6 +47,7 @@ if st.sidebar.button("一時ファイルをクリーンアップ (全て削除)"
             shutil.rmtree(full_cleanup_path)
             st.session_state.global_temp_dir = None
             st.session_state.df = pd.DataFrame()
+            st.session_state.df_filtered = pd.DataFrame()
             if 'found_log_files' in st.session_state:
                 del st.session_state.found_log_files
             st.session_state.current_page = "data_upload"
@@ -61,43 +65,47 @@ if st.sidebar.button("一時ファイルをクリーンアップ (全て削除)"
         print(f"DEBUG: ディレクトリ '{full_cleanup_path}' は存在しませんでした。")
 
 # --- メインコンテンツのUIとルーティング ---
-col_main_header, col_top_button = st.columns([4, 1])
+col_main_header, col_nav_button, col_top_button = st.columns([3, 1, 1])
 with col_main_header:
     st.title("Syslog Filter Application")
+with col_nav_button:
+    # 日時指定ページとデータ読み込みページ以外でボタンを表示
+    if not st.session_state.df.empty and st.session_state.current_page != "datetime_spec" and st.session_state.current_page != "data_upload":
+        if st.button(":calendar: 日時指定ページへ", key="nav_to_datetime_spec_btn_top"):
+            st.session_state.current_page = "datetime_spec"
+            st.rerun()
 with col_top_button:
-    # データ読み込みページ以外でボタンを表示
     if st.session_state.current_page != "data_upload":
-        if st.button(":house: データ読み込みページへ戻る"):
+        if st.button(":house: トップページへ戻る"):
             st.session_state.current_page = "data_upload"
+            st.session_state.is_returning_from_top_button = True
             st.rerun()
 
 # --- ステップインジケーター ---
-if st.session_state.df.empty:
-    st.markdown("<h3><span style='color: green;'>1. データ読み込み</span> > <span style='color: gray;'>2. ログ分析</span></h3>", unsafe_allow_html=True)
-else:
-    st.markdown("<h3><span style='color: gray;'>1. データ読み込み</span> > <span style='color: green;'>2. ログ分析</span></h3>", unsafe_allow_html=True)
+step1_color = "green" if st.session_state.current_page == "data_upload" else "gray"
+step2_color = "green" if st.session_state.current_page == "datetime_spec" else "gray"
+# step3_color = "green" if st.session_state.current_page in ["keyword_filter", "timeline_diagram"] else "gray" # 変更前
+step3_color = "green" if st.session_state.current_page == "keyword_filter" else "gray" # 変更後 (timeline_diagram を削除)
+
+st.markdown(
+    f"<h3><span style='color: {step1_color};'>1. データ読み込み</span> > <span style='color: {step2_color};'>2. 日時指定・抽出</span> > <span style='color: {step3_color};'>3. ログ分析</span></h3>",
+    unsafe_allow_html=True
+)
 st.markdown("---")
 
 
-# データが読み込まれていない場合は強制的にデータ読み込みページを表示
+# ルーティングロジック
 if st.session_state.df.empty and st.session_state.current_page != "about":
     st.warning("ログデータを読み込むまで、他の機能は選択できません。")
     st.session_state.current_page = "data_upload"
-
-# --- ページ表示ロジック ---
-if st.session_state.current_page == "data_upload":
     upload_data_page.run()
+elif st.session_state.current_page == "datetime_spec":
+    datetime_spec_page.run()
 elif st.session_state.current_page == "keyword_filter":
-    if st.session_state.df.empty:
-        st.session_state.current_page = "data_upload"
-        st.rerun()
-    else:
-        existing_filter_page.run()
-elif st.session_state.current_page == "datetime_extract":
-    if st.session_state.df.empty:
-        st.session_state.current_page = "data_upload"
-        st.rerun()
-    else:
-        datetime_extract_page.run()
+    existing_filter_page.run()
+# elif st.session_state.current_page == "timeline_diagram": # 変更前
+#     timeline_diagram_page.run() # 変更前
 elif st.session_state.current_page == "about":
     about_page.run()
+else:
+    upload_data_page.run()
