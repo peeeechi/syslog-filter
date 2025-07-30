@@ -65,19 +65,23 @@ def run():
     else:
         if not st.session_state.df.empty:
             st.success(f"{len(st.session_state.df)}件のログデータが現在読み込まれています。")
-            st.dataframe(st.session_state.df.head())
+            
+            display_df_head = st.session_state.df.head().copy()
+            if 'Timestamp' in display_df_head.columns and pd.api.types.is_datetime64_any_dtype(display_df_head['Timestamp']):
+                display_df_head['Timestamp'] = display_df_head['Timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
+            
+            st.dataframe(
+                display_df_head # column_config 引数を削除
+            )
+            
             st.markdown("---")
         else:
             st.info("ログファイルがまだ読み込まれていません。")
 
-    # --- 修正箇所: 自動遷移ロジックのみ残す ---
     if not st.session_state.df.empty:
-        # トップページに戻るボタンからの遷移ではない場合のみ、自動遷移
         if not st.session_state.get('is_returning_from_top_button', False):
             st.session_state.current_page = "datetime_spec"
             st.rerun()
         else:
-            # フラグをリセットし、ページに留まる
             st.session_state.is_returning_from_top_button = False
-            # ログデータが読み込まれていれば、その旨を表示
             st.info("ログデータの読み込みが完了しました。左側の「日時指定・抽出」に進んでください。")

@@ -133,7 +133,16 @@ def run():
         st.write(f"絞り込み後のログの行数: {len(st.session_state.df_filtered)}行")
         
         if not st.session_state.df_filtered.empty:
-            st.dataframe(st.session_state.df_filtered.head())
+            display_df_filtered = st.session_state.df_filtered.copy()
+            if 'Timestamp' in display_df_filtered.columns and pd.api.types.is_datetime64_any_dtype(display_df_filtered['Timestamp']):
+                display_df_filtered['Timestamp'] = display_df_filtered['Timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
+            
+            # --- 修正箇所: column_config を削除 ---
+            st.dataframe(
+                display_df_filtered.head() # column_config 引数を削除
+            )
+            # ------------------------------------
+            
             st.markdown("---")
 
             download_format = st.radio("ダウンロード形式を選択", ("CSV", "LOG"), key="download_spec_format")
@@ -147,7 +156,7 @@ def run():
                     mime="text/csv",
                     key="download_spec_csv"
                 )
-            else:
+            else: # LOG形式
                 log_lines_output = []
                 for _, row in st.session_state.df_filtered.iterrows():
                     timestamp_str = row['Timestamp'].isoformat() if pd.notna(row['Timestamp']) else ""
@@ -172,7 +181,7 @@ def run():
         
         st.markdown("---")
         st.subheader("次のステップへ")
-        col_btn1, = st.columns(1) # <-- 修正箇所: カラムリストのアンパック
+        col_btn1, = st.columns(1)
         with col_btn1:
             if st.button("キーワードフィルタリングへ", key="nav_to_keyword_from_spec"):
                 st.session_state.current_page = "keyword_filter"
