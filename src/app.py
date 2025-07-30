@@ -1,19 +1,20 @@
 # src/app.py
 import sys
 import os
+
+# --- 修正箇所: プロジェクトのルートディレクトリをsys.pathに追加 (一番上に移動) ---
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+# ----------------------------------------------------------------------------------
+
 import streamlit as st
 import shutil
 from datetime import datetime
 import pandas as pd
 
-# プロジェクトのルートディレクトリをsys.pathに追加
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-if project_root not in sys.path:
-    sys.path.append(project_root)
-
 # 各ページをインポート
-# from src.app_pages import existing_filter_page, datetime_extract_page, about_page, upload_data_page, timeline_diagram_page, datetime_spec_page # 変更前
-from src.app_pages import existing_filter_page, datetime_extract_page, about_page, upload_data_page, datetime_spec_page # 変更後 (timeline_diagram_page を削除)
+from src.app_pages import upload_data_page, datetime_spec_page, existing_filter_page, about_page
 
 st.set_page_config(layout="wide")
 
@@ -84,8 +85,7 @@ with col_top_button:
 # --- ステップインジケーター ---
 step1_color = "green" if st.session_state.current_page == "data_upload" else "gray"
 step2_color = "green" if st.session_state.current_page == "datetime_spec" else "gray"
-# step3_color = "green" if st.session_state.current_page in ["keyword_filter", "timeline_diagram"] else "gray" # 変更前
-step3_color = "green" if st.session_state.current_page == "keyword_filter" else "gray" # 変更後 (timeline_diagram を削除)
+step3_color = "green" if st.session_state.current_page == "keyword_filter" else "gray"
 
 st.markdown(
     f"<h3><span style='color: {step1_color};'>1. データ読み込み</span> > <span style='color: {step2_color};'>2. 日時指定・抽出</span> > <span style='color: {step3_color};'>3. ログ分析</span></h3>",
@@ -103,8 +103,6 @@ elif st.session_state.current_page == "datetime_spec":
     datetime_spec_page.run()
 elif st.session_state.current_page == "keyword_filter":
     existing_filter_page.run()
-# elif st.session_state.current_page == "timeline_diagram": # 変更前
-#     timeline_diagram_page.run() # 変更前
 elif st.session_state.current_page == "about":
     about_page.run()
 else:

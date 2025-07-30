@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date, time, timedelta
 import io
+import csv
+import pytz
 
 def generate_hour_options():
     """00から23までの時間の選択肢を文字列で生成する"""
@@ -106,13 +108,39 @@ def run():
     if st.button("絞り込みを実行", key="filter_datetime_button"):
         with st.spinner('ログデータを絞り込み中...'):
             filtered_df = df_source.copy()
+            
+            start_datetime_full_naive = datetime.combine(start_date_selection, start_time_obj)
+            # --- 修正箇所: timedelta の部分を再度追加 ---
+            end_datetime_full_naive = datetime.combine(end_date_selection, end_time_obj) + timedelta(seconds=59, microseconds=999999)
+            # -----------------------------------------------
+            
+            if not df_source.empty and 'Timestamp' in df_source.columns and pd.api.types.is_datetime64_any_dtype(df_source['Timestamp']):
+                df_tz = df_source['Timestamp'].dt.tz
+                
+                if df_tz:
+                    try:
+                        tz_name = str(df_tz)
+                        target_timezone = pytz.timezone(tz_name)
+                        start_datetime_full = target_timezone.localize(start_datetime_full_naive)
+                        end_datetime_inclusive = target_timezone.localize(end_datetime_full_naive)
+                    except pytz.exceptions.UnknownTimeZoneError:
+                        st.warning(f"不明なタイムゾーン: {tz_name} が検出されました。時刻フィルタリングはタイムゾーンを考慮せずに行われます。")
+                        filtered_df['Timestamp'] = filtered_df['Timestamp'].dt.tz_localize(None)
+                        start_datetime_full = start_datetime_full_naive
+                        end_datetime_inclusive = end_datetime_full_naive
+                else:
+                    start_datetime_full = start_datetime_full_naive
+                    end_datetime_inclusive = end_datetime_full_naive
+            else:
+                start_datetime_full = start_datetime_full_naive
+                end_datetime_inclusive = end_datetime_full_naive
+            
             if 'Timestamp' in filtered_df.columns and pd.api.types.is_datetime64_any_dtype(filtered_df['Timestamp']):
                 filtered_df = filtered_df[
-                    (filtered_df['Timestamp'].dt.date >= start_date_selection) &
-                    (filtered_df['Timestamp'].dt.date <= end_date_selection) &
-                    (filtered_df['Timestamp'].dt.time >= start_time_obj) &
-                    (filtered_df['Timestamp'].dt.time <= end_time_obj)
+                    (filtered_df['Timestamp'] >= start_datetime_full) &
+                    (filtered_df['Timestamp'] <= end_datetime_inclusive)
                 ]
+            
             st.session_state.df_filtered = filtered_df
             
             st.session_state.datetime_spec_conditions = {
@@ -137,18 +165,24 @@ def run():
             if 'Timestamp' in display_df_filtered.columns and pd.api.types.is_datetime64_any_dtype(display_df_filtered['Timestamp']):
                 display_df_filtered['Timestamp'] = display_df_filtered['Timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
             
-            # --- 修正箇所: column_config を削除 ---
-            st.dataframe(
-                display_df_filtered.head() # column_config 引数を削除
-            )
-            # ------------------------------------
+            total_rows = len(display_df_filtered)
+            if total_rows > 6:
+                st.dataframe(display_df_filtered.head(3), use_container_width=True)
+                st.write(f"中略（さらに {total_rows - 6} 行のログがあります）")
+                st.dataframe(display_df_filtered.tail(3), use_container_width=True)
+            else:
+                st.dataframe(display_df_filtered, use_container_width=True)
             
             st.markdown("---")
 
             download_format = st.radio("ダウンロード形式を選択", ("CSV", "LOG"), key="download_spec_format")
 
             if download_format == "CSV":
-                csv_data_datetime = st.session_state.df_filtered.to_csv(index=False).encode('utf-8')
+                csv_data_datetime = st.session_state.df_filtered.to_csv(
+                    index=False, 
+                    quoting=csv.QUOTE_ALL,
+                    escapechar='\\'
+                ).encode('utf-8')
                 st.download_button(
                     label="抽出ログをCSVでダウンロード",
                     data=csv_data_datetime,
