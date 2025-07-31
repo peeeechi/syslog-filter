@@ -4,3 +4,4 @@ streamlit==1.46.1
 pyyaml
 typeguard
 zstandard
+pytz
